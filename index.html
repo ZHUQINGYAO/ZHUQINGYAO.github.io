@@ -17,6 +17,7 @@
       background: #f5f7fa;
     }
 
+    /* 登录页 */
     .login-box {
       min-height: 100vh;
       display: flex;
@@ -80,6 +81,7 @@
       color: #f56c6c;
     }
 
+    /* 内容页（默认隐藏） */
     .content {
       display: none;
       padding: 20px;
@@ -118,8 +120,8 @@
 
     .chart-box {
       width: 100%;
-      height: 320px;
-      margin-top: 10px;
+      height: 380px;
+      margin-top: 15px;
     }
 
     .flex-row {
@@ -127,6 +129,7 @@
       gap: 8px;
       flex-wrap: wrap;
       margin-bottom: 10px;
+      align-items: center;
     }
 
     select, button {
@@ -152,11 +155,21 @@
       background: #ccc;
       cursor: not-allowed;
     }
+
+    /* 健康建议模块样式优化 */
+    #suggestion {
+      margin-top: 16px;
+      line-height: 1.8;
+      padding: 12px;
+      border-radius: 8px;
+      background-color: #f8fbff;
+    }
   </style>
 </head>
 
 <body>
 
+  <!-- 登录页 -->
   <div class="login-box" id="loginPage">
     <div class="login-card">
       <h2>学生健康数据查询</h2>
@@ -173,28 +186,30 @@
     </div>
   </div>
 
+  <!-- 内容页（隐藏） -->
   <div class="content" id="contentPage">
     <button class="btn-back" onclick="backToLogin()">← 返回登录</button>
 
+    <!-- 数据录入模块 -->
     <div class="card">
       <h3>📥 数据录入</h3>
       <button class="closed" disabled>暂未开放</button>
     </div>
 
+    <!-- 个人历史数据表格 -->
     <div class="card">
       <h3>📊 个人历史数据</h3>
       <div id="resultTable"></div>
     </div>
 
+    <!-- 【完整保留：整体健康分析表格 + 精准健康建议模块】你第一张图红框全部保留 -->
     <div class="card">
       <h3>📊 整体健康分析（归一化对比）</h3>
       <div id="analysisTable"></div>
-      <div class="chart-box">
-        <canvas id="normalChart"></canvas>
-      </div>
       <div id="suggestion" style="margin-top:16px; line-height:1.6;"></div>
     </div>
 
+    <!-- 数据可视化模块（全部功能合并到这里） -->
     <div class="card">
       <h3>📈 数据可视化</h3>
       <div class="flex-row">
@@ -208,12 +223,16 @@
           <option value="fat">体脂率</option>
           <option value="heart">心率</option>
           <option value="sugar">血糖</option>
+          <option value="all">全部指标综合趋势图</option>
+          <option value="normal">整体归一化对比图</option>
         </select>
         <select id="dataItem2">
-          <option value="none">不选</option>
+          <option value="none">不选额外指标</option>
           <option value="weight">体重</option>
           <option value="bmi">BMI</option>
           <option value="fat">体脂率</option>
+          <option value="heart">心率</option>
+          <option value="sugar">血糖</option>
         </select>
         <button onclick="drawChart()">生成图表</button>
       </div>
@@ -224,7 +243,7 @@
   </div>
 
 <script>
-const sourceData = [
+  const sourceData = [
 { id: "246963676001", name: "小红", date: "2026-04-01", weight: 48.24, bmi: 21.4, fat: 0.312, sugar: 5.1, heart: 79, pressure: 111, sbp: 114, dbp: 89 },
 { id: "246963676001", name: "小红", date: "2026-05-01", weight: 47.8, bmi: 21.2, fat: 0.305, sugar: 5.0, heart: 77, pressure: 108, sbp: 112, dbp: 87 },
 { id: "246963676001", name: "小红", date: "2026-06-01", weight: 47.5, bmi: 21.0, fat: 0.298, sugar: 4.9, heart: 75, pressure: 105, sbp: 110, dbp: 85 },
@@ -236,8 +255,8 @@ const sourceData = [
 
 let currentUser = null;
 let chartInstance = null;
-let normalChart = null;
 
+// 登录 → 成功直接跳转到内容页
 function login() {
   const id = document.getElementById("searchId").value.trim();
   const name = document.getElementById("searchName").value.trim();
@@ -260,17 +279,20 @@ function login() {
   goToContent();
 }
 
+// 跳转到内容页
 function goToContent() {
   document.getElementById("loginPage").style.display = "none";
   document.getElementById("contentPage").style.display = "block";
 }
 
+// 返回登录
 function backToLogin() {
   document.getElementById("contentPage").style.display = "none";
   document.getElementById("loginPage").style.display = "flex";
   document.getElementById("tip").innerText = "";
 }
 
+// 显示个人历史数据表格
 function showTable() {
   const user = currentUser[0];
   let html = `<strong>${user.name}（${user.id}）</strong><br><br>`;
@@ -290,9 +312,10 @@ function showTable() {
   document.getElementById("resultTable").innerHTML = html;
 }
 
-// 整体分析 + 归一化图表 + 异常标红 + 自动建议
+// ================== 整体分析表格 + 精细化分级健康建议（完全保留你原图红框）==================
 function showAnalysis() {
   const latest = currentUser[currentUser.length - 1];
+  // 国内大学生通用健康医学标准（偏低/正常/偏高 三档完整界限）
   const norms = [
     { name: "BMI", val: latest.bmi, min: 18.5, max: 23.9 },
     { name: "体脂率", val: (latest.fat*100), min: 10, max: 30 },
@@ -303,19 +326,20 @@ function showAnalysis() {
   ];
 
   let table = `<table><tr><th>指标</th><th>数值</th><th>正常范围</th><th>状态</th></tr>`;
-  let suggest = [];
+  let suggestList = [];
 
   norms.forEach(item => {
     let v = parseFloat(item.val);
     let status = "正常";
-    let color = "#67c23a";
+    let color = "#67c23a"; // 正常绿色
 
+    // 三档判断：偏低 / 正常 / 偏高
     if (v < item.min) {
       status = "偏低";
-      color = "#f56c6c";
+      color = "#f56c6c"; // 异常红色
     } else if (v > item.max) {
       status = "偏高";
-      color = "#f56c6c";
+      color = "#f56c6c"; // 异常红色
     }
 
     let unit = item.name === "体脂率" ? "%" : "";
@@ -326,78 +350,163 @@ function showAnalysis() {
       <td style="color:${color}">${status}</td>
     </tr>`;
 
+    // ========== 每个指标单独精细化健康建议（你要的生活化详细建议）==========
     if (status !== "正常") {
-      suggest.push(`${item.name}${status}，请注意调整生活习惯。`);
+      switch(item.name) {
+        case "BMI":
+          if(v < 18.5){
+            suggestList.push("【BMI偏低】建议增加优质蛋白摄入，多食用肉类、蛋奶、谷物，少食多餐，适度力量训练增重，均衡营养。");
+          }else{
+            suggestList.push("【BMI偏高】建议控制高热量饮食，减少油炸、甜食摄入，多吃蔬菜粗粮，规律进行跑步、跳绳等有氧运动，控制体重。");
+          }
+          break;
+        case "体脂率":
+          if(v < 10){
+            suggestList.push("【体脂率偏低】建议均衡饮食，适当补充脂肪与蛋白质，避免过度减脂，保证身体基础代谢所需营养。");
+          }else{
+            suggestList.push("【体脂率偏高】建议低脂饮食，多吃膳食纤维蔬菜，坚持每日有氧减脂运动，减少久坐。");
+          }
+          break;
+        case "血糖":
+          if(v < 3.9){
+            suggestList.push("【血糖偏低】建议三餐规律按时吃饭，随身备糖果、小点心，避免空腹剧烈运动，防止低血糖头晕。");
+          }else{
+            suggestList.push("【血糖偏高】建议严格控糖，少喝奶茶甜品、精制米面，多吃粗粮蔬菜，规律作息，定期监测血糖。");
+          }
+          break;
+        case "心率":
+          if(v < 60){
+            suggestList.push("【心率偏低】若无身体不适属于生理性正常；若伴随乏力头晕，建议加强有氧运动，规律作息，必要时就医检查。");
+          }else{
+            suggestList.push("【心率偏高】建议少熬夜、避免情绪焦虑，减少咖啡因摄入，保证充足睡眠，日常多做舒缓有氧运动。");
+          }
+          break;
+        case "收缩压":
+          if(v < 90){
+            suggestList.push("【收缩压偏低】建议日常多补充水分，均衡营养，避免猛地起身，适度散步运动改善循环。");
+          }else{
+            suggestList.push("【收缩压偏高】建议低盐清淡饮食，减少腌制品、重盐食物，少熬夜，舒缓压力，日常散步慢跑。");
+          }
+          break;
+        case "舒张压":
+          if(v < 60){
+            suggestList.push("【舒张压偏低】建议保证充足睡眠，补充营养，适度运动改善身体血液循环。");
+          }else{
+            suggestList.push("【舒张压偏高】建议低盐饮食，戒烟少酒，避免长期久坐熬夜，保持平稳心态。");
+          }
+          break;
+      }
     }
   });
 
   table += "</table>";
   document.getElementById("analysisTable").innerHTML = table;
 
-  if (suggest.length === 0) {
-    document.getElementById("suggestion").innerHTML = "✅ 健康状况良好，请继续保持！";
+  // 最终汇总展示健康建议
+  if (suggestList.length === 0) {
+    document.getElementById("suggestion").innerHTML = "✅ 健康状况良好，所有身体指标均处于正常范围，请继续保持良好的饮食、运动与作息习惯！";
   } else {
-    document.getElementById("suggestion").innerHTML = "⚠ 健康建议：<br>" + suggest.join("<br>");
+    document.getElementById("suggestion").innerHTML = "⚠ 个性化健康建议：<br>" + suggestList.join("<br>");
   }
-
-  const normData = norms.map(i => {
-    let v = parseFloat(i.val);
-    return (v - i.min) / (i.max - i.min);
-  });
-
-  const ctx = document.getElementById("normalChart").getContext("2d");
-  if (normalChart) normalChart.destroy();
-  normalChart = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: norms.map(i => i.name),
-      datasets: [{
-        label: "归一化指标（0~1，越接近0.5越标准）",
-        data: normData,
-        backgroundColor: "#2d8cf0"
-      }]
-    },
-    options: { responsive: true, maintainAspectRatio: false }
-  });
 }
 
+// ================== 全能数据可视化函数（全部功能整合）==================
 function drawChart() {
   const type = document.getElementById("chartType").value;
   const item1 = document.getElementById("dataItem1").value;
   const item2 = document.getElementById("dataItem2").value;
 
-  const labels = currentUser.map(i => i.date);
+  // 销毁旧图表
+  if (chartInstance) chartInstance.destroy();
+  const ctx = document.getElementById("dataChart").getContext("2d");
+
+  // 指标字段映射 + 配色（完全统一你原图颜色）
   const map = {
-    weight: { label: "体重", key: "weight", color: "#2d8cf0" },
+    weight: { label: "体重(kg)", key: "weight", color: "#2d8cf0" },
     bmi: { label: "BMI", key: "bmi", color: "#67c23a" },
     fat: { label: "体脂率", key: "fat", color: "#e6a23c" },
     heart: { label: "心率", key: "heart", color: "#f56c6c" },
-    sugar: { label: "血糖", key: "sugar", color: "#909399" }
+    sugar: { label: "血糖", key: "sugar", color: "#909399" },
+    sbp: { label: "收缩压", key: "sbp", color: "#36cfc9" },
+    dbp: { label: "舒张压", key: "dbp", color: "#5c6bc0" },
+    pressure: { label: "压力指数", key: "pressure", color: "#b37feb" }
   };
 
-  const datasets = [{
-    label: map[item1].label,
-    data: currentUser.map(i => i[map[item1].key]),
-    borderColor: map[item1].color,
-    backgroundColor: map[item1].color + "33",
-    tension: 0.3
-  }];
+  const labels = currentUser.map(i => i.date);
+  let datasets = [];
 
-  if (item2 !== "none") {
-    datasets.push({
-      label: map[item2].label,
-      data: currentUser.map(i => i[map[item2].key]),
-      borderColor: map[item2].color,
-      backgroundColor: map[item2].color + "33",
-      tension: 0.3
-    });
+  // ========== 模式1：选择【全部指标综合趋势图】（你第三张图完整多曲线效果） ==========
+  if(item1 === "all"){
+    // 把所有指标全部绘制成同一张图的曲线
+    const allKey = ["weight","bmi","fat","sugar","heart","pressure","sbp","dbp"];
+    allKey.forEach(key=>{
+      datasets.push({
+        label: map[key].label,
+        data: currentUser.map(i => i[map[key].key]),
+        borderColor: map[key].color,
+        backgroundColor: map[key].color + "33",
+        tension: 0.3,
+        fill: false
+      })
+    })
   }
 
-  if (chartInstance) chartInstance.destroy();
-  const ctx = document.getElementById("dataChart").getContext("2d");
+  // ========== 模式2：选择【整体归一化对比图】（你之前的0~1归一化柱状图，合并进此处） ==========
+  else if(item1 === "normal"){
+    const latest = currentUser[currentUser.length - 1];
+    const norms = [
+      { name: "BMI", val: latest.bmi, min: 18.5, max: 23.9 },
+      { name: "体脂率", val: (latest.fat*100), min: 10, max: 30 },
+      { name: "血糖", val: latest.sugar, min: 3.9, max: 6.1 },
+      { name: "心率", val: latest.heart, min: 60, max: 100 },
+      { name: "收缩压", val: latest.sbp, min: 90, max: 120 },
+      { name: "舒张压", val: latest.dbp, min: 60, max: 80 }
+    ];
+    // 归一化公式：(数值-最小值)/(最大值-最小值) 统一缩放到0~1区间
+    const normData = norms.map(i => (parseFloat(i.val) - i.min) / (i.max - i.min));
+    datasets = [{
+      label: "归一化指标（0~1，越接近0.5越标准）",
+      data: normData,
+      backgroundColor: "#2d8cf0"
+    }]
+  }
+
+  // ========== 模式3：原有基础模式：单个/双个指标时间趋势图 ==========
+  else{
+    // 主选指标
+    datasets.push({
+      label: map[item1].label,
+      data: currentUser.map(i => i[map[item1].key]),
+      borderColor: map[item1].color,
+      backgroundColor: map[item1].color + "33",
+      tension: 0.3
+    });
+    // 额外多选第二个指标
+    if (item2 !== "none") {
+      datasets.push({
+        label: map[item2].label,
+        data: currentUser.map(i => i[map[item2].key]),
+        borderColor: map[item2].color,
+        backgroundColor: map[item2].color + "33",
+        tension: 0.3
+      });
+    }
+  }
+
+  // 统一渲染图表
   chartInstance = new Chart(ctx, {
-    type, data: { labels, datasets },
-    options: { responsive: true, maintainAspectRatio: false }
+    type: item1 === "normal" ? "bar" : type, // 归一化固定柱状图，其余跟随用户选折线/柱状
+    data: { labels, datasets },
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: false,
+      plugins:{
+        title:{
+          display:true,
+          text:"健康数据图表"
+        }
+      }
+    }
   });
 }
 </script>
