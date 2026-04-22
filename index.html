@@ -81,6 +81,22 @@
       color: #f56c6c;
     }
 
+    /* 新增：登录页展示用户反馈记录区域 */
+    .feedback-show {
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+      font-size: 13px;
+      color: #333;
+      line-height: 1.7;
+      display: none;
+    }
+    .feedback-show h4 {
+      color: #2d8cf0;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
     /* 内容页（默认隐藏） */
     .content {
       display: none;
@@ -211,6 +227,12 @@
       </div>
       <button class="btn-login" onclick="login()">认证并查询</button>
       <div class="tip" id="tip"></div>
+
+      <!-- ========== 新增：首页展示用户提交的反馈信息区域 ========== -->
+      <div class="feedback-show" id="loginFeedbackBox">
+        <h4>📝 历史用户反馈记录</h4>
+        <div id="loginFeedbackContent"></div>
+      </div>
     </div>
   </div>
 
@@ -269,8 +291,7 @@
       </div>
     </div>
 
-    <!-- ====================== 新增：用户反馈模块 ====================== -->
-    <!-- 色、香、味打分 + 留言，仅界面展示，不后台存储、不写入数据 -->
+    <!-- ====================== 用户反馈模块 ====================== -->
     <div class="card">
       <h3>📝 用户反馈</h3>
       
@@ -334,6 +355,8 @@
 
 let currentUser = null;
 let chartInstance = null;
+// 全局存储用户提交的反馈数据
+let userFeedbackData = null;
 
 // 登录函数
 function login() {
@@ -364,10 +387,14 @@ function goToContent() {
   document.getElementById("contentPage").style.display = "block";
 }
 
+// 返回登录页面（同时自动渲染反馈内容到首页）
 function backToLogin() {
   document.getElementById("contentPage").style.display = "none";
   document.getElementById("loginPage").style.display = "flex";
   document.getElementById("tip").innerText = "";
+
+  // 返回首页时，把保存的反馈数据展示出来
+  showFeedbackOnLogin();
 }
 
 // 个人历史数据表格
@@ -392,7 +419,6 @@ function showTable() {
 
 // ================== 整体指标分析 + 精细化健康建议 ==================
 function showAnalysis() {
-  // 只选取【用户最新一条数据】
   const latest = currentUser[currentUser.length - 1];
   const norms = [
     { name: "BMI", val: latest.bmi, min: 18.5, max: 23.9 },
@@ -523,7 +549,7 @@ function drawChart() {
     })
   }
 
-  // 整体归一化对比图（严格老师要求：最新数据+归一化+异常柱子标红）
+  // 整体归一化对比图
   else if(item1 === "normal"){
     const latest = currentUser[currentUser.length - 1];
     const norms = [
@@ -542,7 +568,6 @@ function drawChart() {
       const result = (v - item.min) / (item.max - item.min);
       normData.push(result);
 
-      // 异常柱子标红，正常蓝色
       if(v < item.min || v > item.max){
         barColor.push("#f56c6c");
       }else{
@@ -596,7 +621,7 @@ function drawChart() {
   });
 }
 
-// ================== 新增：用户反馈提交函数（仅前端提示，不后台存储数据） ==================
+// ================== 用户反馈提交函数 ==================
 function submitFeedback(){
   const color = document.getElementById("colorScore").value;
   const smell = document.getElementById("smellScore").value;
@@ -604,16 +629,39 @@ function submitFeedback(){
   const msg = document.getElementById("userMsg").value;
   const tip = document.getElementById("feedbackTip");
 
-  // 简单前端校验
   if(!color || !smell || !taste){
     tip.style.color = "#f56c6c";
     tip.innerText = "请完成色泽、香气、味道三项打分";
     return;
   }
 
-  // 仅页面提示，**不连接后台、不保存数据、不上传数据库**，完全满足你的要求
+  // 保存反馈数据到全局变量
+  userFeedbackData = {
+    color: color,
+    smell: smell,
+    taste: taste,
+    msg: msg
+  }
+
   tip.style.color = "#67c23a";
   tip.innerText = "✅ 反馈提交成功！感谢您的评价与留言（数据仅前端展示，暂不录入后台）";
+}
+
+// ========== 新增：把反馈内容渲染显示到**第一个登录首页** ==========
+function showFeedbackOnLogin(){
+  const box = document.getElementById("loginFeedbackBox");
+  const content = document.getElementById("loginFeedbackContent");
+
+  // 如果有提交过反馈数据，就显示区域并展示内容
+  if(userFeedbackData){
+    box.style.display = "block";
+    content.innerHTML = `
+      <div>色泽评分：${userFeedbackData.color} 分</div>
+      <div>香气评分：${userFeedbackData.smell} 分</div>
+      <div>味道评分：${userFeedbackData.taste} 分</div>
+      <div style="margin-top:6px;">用户留言：${userFeedbackData.msg}</div>
+    `;
+  }
 }
 </script>
 
