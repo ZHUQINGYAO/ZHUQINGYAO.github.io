@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>学生健康数据查询</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -17,6 +17,7 @@
       background: #f5f7fa;
     }
 
+    /* 登录页 */
     .login-box {
       min-height: 100vh;
       display: flex;
@@ -80,6 +81,7 @@
       color: #f56c6c;
     }
 
+    /* 内容页（默认隐藏） */
     .content {
       display: none;
       padding: 20px;
@@ -154,6 +156,7 @@
       cursor: not-allowed;
     }
 
+    /* 健康建议模块样式 */
     #suggestion {
       margin-top: 16px;
       line-height: 1.8;
@@ -161,10 +164,40 @@
       border-radius: 8px;
       background-color: #f8fbff;
     }
+
+    /* 新增：用户反馈模块样式（色、香、味打分 + 留言） */
+    .feedback-item {
+      margin-bottom: 15px;
+    }
+    .feedback-item label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+      color: #333;
+    }
+    .feedback-item select,
+    .feedback-item textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+    .feedback-item textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+    .feedback-tip {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #666;
+    }
   </style>
 </head>
 
 <body>
+
+  <!-- 登录页 -->
   <div class="login-box" id="loginPage">
     <div class="login-card">
       <h2>学生健康数据查询</h2>
@@ -181,25 +214,30 @@
     </div>
   </div>
 
+  <!-- 内容页 -->
   <div class="content" id="contentPage">
     <button class="btn-back" onclick="backToLogin()">← 返回登录</button>
 
+    <!-- 数据录入模块 -->
     <div class="card">
       <h3>📥 数据录入</h3>
       <button class="closed" disabled>暂未开放</button>
     </div>
 
+    <!-- 个人历史数据表格 -->
     <div class="card">
       <h3>📊 个人历史数据</h3>
       <div id="resultTable"></div>
     </div>
 
+    <!-- 【整体健康分析表格 + 精细化健康建议】 -->
     <div class="card">
-      <h3>📊 整体健康分析（归一化对比）</h3>
+      <h3>📊 整体健康指标分析</h3>
       <div id="analysisTable"></div>
-      <div id="suggestion"></div>
+      <div id="suggestion" style="margin-top:16px; line-height:1.6;"></div>
     </div>
 
+    <!-- 数据可视化模块（全部功能整合） -->
     <div class="card">
       <h3>📈 数据可视化</h3>
       <div class="flex-row">
@@ -230,22 +268,74 @@
         <canvas id="dataChart"></canvas>
       </div>
     </div>
+
+    <!-- ====================== 新增：用户反馈模块 ====================== -->
+    <!-- 色、香、味打分 + 留言，仅界面展示，不后台存储、不写入数据 -->
+    <div class="card">
+      <h3>📝 用户反馈</h3>
+      
+      <div class="feedback-item">
+        <label>色泽打分（1-5分）</label>
+        <select id="colorScore">
+          <option value="">请选择分数</option>
+          <option value="1">1分</option>
+          <option value="2">2分</option>
+          <option value="3">3分</option>
+          <option value="4">4分</option>
+          <option value="5">5分</option>
+        </select>
+      </div>
+
+      <div class="feedback-item">
+        <label>香气打分（1-5分）</label>
+        <select id="smellScore">
+          <option value="">请选择分数</option>
+          <option value="1">1分</option>
+          <option value="2">2分</option>
+          <option value="3">3分</option>
+          <option value="4">4分</option>
+          <option value="5">5分</option>
+        </select>
+      </div>
+
+      <div class="feedback-item">
+        <label>味道打分（1-5分）</label>
+        <select id="tasteScore">
+          <option value="">请选择分数</option>
+          <option value="1">1分</option>
+          <option value="2">2分</option>
+          <option value="3">3分</option>
+          <option value="4">4分</option>
+          <option value="5">5分</option>
+        </select>
+      </div>
+
+      <div class="feedback-item">
+        <label>留言建议</label>
+        <textarea id="userMsg" placeholder="请输入您的留言、建议与评价内容"></textarea>
+      </div>
+
+      <button onclick="submitFeedback()">提交反馈</button>
+      <div class="feedback-tip" id="feedbackTip"></div>
+    </div>
+
   </div>
 
 <script>
-const sourceData = [
+  const sourceData = [
   { id: "001", name: "小红", date: "2026-04-01", weight: 48.24, bmi: 21.4, fat: 0.312, sugar: 5.1, heart: 79, pressure: 111, sbp: 114, dbp: 89 },
   { id: "001", name: "小红", date: "2026-05-01", weight: 47.8, bmi: 21.2, fat: 0.305, sugar: 5.0, heart: 77, pressure: 108, sbp: 112, dbp: 87 },
   { id: "001", name: "小红", date: "2026-06-01", weight: 47.5, bmi: 21.0, fat: 0.298, sugar: 4.9, heart: 75, pressure: 105, sbp: 110, dbp: 85 },
   { id: "002", name: "小明", date: "2026-04-10", weight: 64.79, bmi: 23.5, fat: 0.303, sugar: 4.6, heart: 66, pressure: 93, sbp: 110, dbp: 79 },
   { id: "002", name: "小明", date: "2026-06-10", weight: 63.5, bmi: 23.0, fat: 0.295, sugar: 4.5, heart: 65, pressure: 90, sbp: 108, dbp: 78 },
   { id: "003", name: "李强军", date: "2026-05-06", weight: 55.23, bmi: 20.0, fat: 0.118, sugar: 4.9, heart: 71, pressure: 96, sbp: 126, dbp: 62 },
-  { id: "003", name: "李强军", date: "2026-06-06", weight: 54.8, bmi: 19.8, fat: 0.115, sugar: 4.8, heart: 70, pressure: 94, sbp: 124, dbp: 61 }
+  { id: "003", name: "李强军", date: "2026-06-06", weight: 54.8, bmi: 19.8, fat: 0.115, sugar: 4.8, heart: 70, pressure: 94, sbp: 124, dbp: 61 } 
 ];
 
 let currentUser = null;
 let chartInstance = null;
 
+// 登录函数
 function login() {
   const id = document.getElementById("searchId").value.trim();
   const name = document.getElementById("searchName").value.trim();
@@ -268,6 +358,7 @@ function login() {
   goToContent();
 }
 
+// 页面跳转
 function goToContent() {
   document.getElementById("loginPage").style.display = "none";
   document.getElementById("contentPage").style.display = "block";
@@ -279,6 +370,7 @@ function backToLogin() {
   document.getElementById("tip").innerText = "";
 }
 
+// 个人历史数据表格
 function showTable() {
   const user = currentUser[0];
   let html = `<strong>${user.name}（${user.id}）</strong><br><br>`;
@@ -298,7 +390,9 @@ function showTable() {
   document.getElementById("resultTable").innerHTML = html;
 }
 
+// ================== 整体指标分析 + 精细化健康建议 ==================
 function showAnalysis() {
+  // 只选取【用户最新一条数据】
   const latest = currentUser[currentUser.length - 1];
   const norms = [
     { name: "BMI", val: latest.bmi, min: 18.5, max: 23.9 },
@@ -309,7 +403,7 @@ function showAnalysis() {
     { name: "舒张压", val: latest.dbp, min: 60, max: 80 }
   ];
 
-  let table = `<table><tr><th>指标</th><th>数值</th><th>正常范围</th><th>状态</th></tr>`;
+  let table = `<table><tr><th>指标</th><th>原始数值</th><th>正常范围</th><th>健康状态</th></tr>`;
   let suggestList = [];
 
   norms.forEach(item => {
@@ -336,34 +430,46 @@ function showAnalysis() {
     if (status !== "正常") {
       switch(item.name) {
         case "BMI":
-          suggestList.push(v < 18.5 ?
-            "【BMI偏低】建议增加优质蛋白摄入，多食用肉类、蛋奶、谷物，少食多餐，适度力量训练增重，均衡营养。"
-            : "【BMI偏高】建议控制高热量饮食，减少油炸、甜食摄入，多吃蔬菜粗粮，规律进行跑步、跳绳等有氧运动，控制体重。");
+          if(v < 18.5){
+            suggestList.push("【BMI偏低】建议增加优质蛋白摄入，多食用肉类、蛋奶、谷物，少食多餐，适度力量训练增重，均衡营养。");
+          }else{
+            suggestList.push("【BMI偏高】建议控制高热量饮食，减少油炸、甜食摄入，多吃蔬菜粗粮，规律进行跑步、跳绳等有氧运动，控制体重。");
+          }
           break;
         case "体脂率":
-          suggestList.push(v < 10 ?
-            "【体脂率偏低】建议均衡饮食，适当补充脂肪与蛋白质，避免过度减脂，保证身体基础代谢所需营养。"
-            : "【体脂率偏高】建议低脂饮食，多吃膳食纤维蔬菜，坚持每日有氧减脂运动，减少久坐。");
+          if(v < 10){
+            suggestList.push("【体脂率偏低】建议均衡饮食，适当补充脂肪与蛋白质，避免过度减脂，保证身体基础代谢所需营养。");
+          }else{
+            suggestList.push("【体脂率偏高】建议低脂饮食，多吃膳食纤维蔬菜，坚持每日有氧减脂运动，减少久坐。");
+          }
           break;
         case "血糖":
-          suggestList.push(v < 3.9 ?
-            "【血糖偏低】建议三餐规律按时吃饭，随身备糖果、小点心，避免空腹剧烈运动，防止低血糖头晕。"
-            : "【血糖偏高】建议严格控糖，少喝奶茶甜品、精制米面，多吃粗粮蔬菜，规律作息，定期监测血糖。");
+          if(v < 3.9){
+            suggestList.push("【血糖偏低】建议三餐规律按时吃饭，随身备糖果、小点心，避免空腹剧烈运动，防止低血糖头晕。");
+          }else{
+            suggestList.push("【血糖偏高】建议严格控糖，少喝奶茶甜品、精制米面，多吃粗粮蔬菜，规律作息，定期监测血糖。");
+          }
           break;
         case "心率":
-          suggestList.push(v < 60 ?
-            "【心率偏低】若无身体不适属于生理性正常；若伴随乏力头晕，建议加强有氧运动，规律作息，必要时就医检查。"
-            : "【心率偏高】建议少熬夜、避免情绪焦虑，减少咖啡因摄入，保证充足睡眠，日常多做舒缓有氧运动。");
+          if(v < 60){
+            suggestList.push("【心率偏低】若无身体不适属于生理性正常；若伴随乏力头晕，建议加强有氧运动，规律作息，必要时就医检查。");
+          }else{
+            suggestList.push("【心率偏高】建议少熬夜、避免情绪焦虑，减少咖啡因摄入，保证充足睡眠，日常多做舒缓有氧运动。");
+          }
           break;
         case "收缩压":
-          suggestList.push(v < 90 ?
-            "【收缩压偏低】建议日常多补充水分，均衡营养，避免猛地起身，适度散步运动改善循环。"
-            : "【收缩压偏高】建议低盐清淡饮食，减少腌制品、重盐食物，少熬夜，舒缓压力，日常散步慢跑。");
+          if(v < 90){
+            suggestList.push("【收缩压偏低】建议日常多补充水分，均衡营养，避免猛地起身，适度散步运动改善循环。");
+          }else{
+            suggestList.push("【收缩压偏高】建议低盐清淡饮食，减少腌制品、重盐食物，少熬夜，舒缓压力，日常散步慢跑。");
+          }
           break;
         case "舒张压":
-          suggestList.push(v < 60 ?
-            "【舒张压偏低】建议保证充足睡眠，补充营养，适度运动改善身体血液循环。"
-            : "【舒张压偏高】建议低盐饮食，戒烟少酒，避免长期久坐熬夜，保持平稳心态。");
+          if(v < 60){
+            suggestList.push("【舒张压偏低】建议保证充足睡眠，补充营养，适度运动改善身体血液循环。");
+          }else{
+            suggestList.push("【舒张压偏高】建议低盐饮食，戒烟少酒，避免长期久坐熬夜，保持平稳心态。");
+          }
           break;
       }
     }
@@ -379,9 +485,8 @@ function showAnalysis() {
   }
 }
 
+// ================== 全能数据可视化函数 ==================
 function drawChart() {
-  if (!currentUser) return;
-
   const type = document.getElementById("chartType").value;
   const item1 = document.getElementById("dataItem1").value;
   const item2 = document.getElementById("dataItem2").value;
@@ -403,6 +508,7 @@ function drawChart() {
   const labels = currentUser.map(i => i.date);
   let datasets = [];
 
+  // 全部指标综合趋势图
   if(item1 === "all"){
     const allKey = ["weight","bmi","fat","sugar","heart","pressure","sbp","dbp"];
     allKey.forEach(key=>{
@@ -416,6 +522,8 @@ function drawChart() {
       })
     })
   }
+
+  // 整体归一化对比图（严格老师要求：最新数据+归一化+异常柱子标红）
   else if(item1 === "normal"){
     const latest = currentUser[currentUser.length - 1];
     const norms = [
@@ -426,13 +534,30 @@ function drawChart() {
       { name: "收缩压", val: latest.sbp, min: 90, max: 120 },
       { name: "舒张压", val: latest.dbp, min: 60, max: 80 }
     ];
-    const normData = norms.map(i => (parseFloat(i.val) - i.min) / (i.max - i.min));
+
+    const normData = [];
+    const barColor = [];
+    norms.forEach(item => {
+      const v = parseFloat(item.val);
+      const result = (v - item.min) / (item.max - item.min);
+      normData.push(result);
+
+      // 异常柱子标红，正常蓝色
+      if(v < item.min || v > item.max){
+        barColor.push("#f56c6c");
+      }else{
+        barColor.push("#2d8cf0");
+      }
+    })
+
     datasets = [{
-      label: "归一化指标（0~1，越接近0.5越标准）",
+      label: "指标归一化数值（0~1区间，越接近0.5越标准）",
       data: normData,
-      backgroundColor: "#2d8cf0"
+      backgroundColor: barColor
     }]
   }
+
+  // 单个/双个指标历史趋势图
   else{
     datasets.push({
       label: map[item1].label,
@@ -454,7 +579,10 @@ function drawChart() {
 
   chartInstance = new Chart(ctx, {
     type: item1 === "normal" ? "bar" : type,
-    data: { labels, datasets },
+    data: { 
+      labels: item1 === "normal" ? norms.map(i=>i.name) : labels, 
+      datasets 
+    },
     options: { 
       responsive: true, 
       maintainAspectRatio: false,
@@ -467,6 +595,27 @@ function drawChart() {
     }
   });
 }
+
+// ================== 新增：用户反馈提交函数（仅前端提示，不后台存储数据） ==================
+function submitFeedback(){
+  const color = document.getElementById("colorScore").value;
+  const smell = document.getElementById("smellScore").value;
+  const taste = document.getElementById("tasteScore").value;
+  const msg = document.getElementById("userMsg").value;
+  const tip = document.getElementById("feedbackTip");
+
+  // 简单前端校验
+  if(!color || !smell || !taste){
+    tip.style.color = "#f56c6c";
+    tip.innerText = "请完成色泽、香气、味道三项打分";
+    return;
+  }
+
+  // 仅页面提示，**不连接后台、不保存数据、不上传数据库**，完全满足你的要求
+  tip.style.color = "#67c23a";
+  tip.innerText = "✅ 反馈提交成功！感谢您的评价与留言（数据仅前端展示，暂不录入后台）";
+}
 </script>
+
 </body>
 </html>
