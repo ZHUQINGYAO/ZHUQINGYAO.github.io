@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>学生健康数据查询与可视化分析</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+    body {
+      background: #f5f7fa;
+      padding: 20px;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 24px;
+    }
+    .title {
+      text-align: center;
+      color: #2d8cf0;
+      margin-bottom: 24px;
+      font-size: 24px;
+    }
+    .section {
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #eee;
+    }
+    .section:last-child {
+      border-bottom: none;
+    }
+    .section h3 {
+      color: #333;
+      margin-bottom: 12px;
+      font-size: 18px;
+    }
+    .query-box {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    input, select, button {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      outline: none;
+    }
+    button {
+      background: #2d8cf0;
+      color: white;
+      cursor: pointer;
+      border: none;
+    }
+    button:hover {
+      background: #1b74d0;
+    }
+    .close {
+      background: #f56c6c;
+    }
+    .close:hover {
+      background: #e54a4a;
+    }
+    .disabled {
+      background: #ccc !important;
+      cursor: not-allowed !important;
+    }
+    .data-card {
+      background: #f9fafc;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 10px;
+      line-height: 1.8;
+    }
+    .chart-box {
+      width: 100%;
+      height: 400px;
+      margin-top: 20px;
+    }
+    .flex-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .tip {
+      color: #999;
+      font-size: 14px;
+    }
+    .auth-success {
+      color: #67c23a;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    .auth-fail {
+      color: #f56c6c;
+      font-weight: bold;
+      margin-left: 10px;
+    }
+    #analysisSection {
+      display: none;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
+    table td, table th {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    table th {
+      background: #e8f3ff;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h2 class="title">学生健康数据查询与可视化分析</h2>
+
+  <!-- 1. 身份认证 + 数据查询 -->
+  <div class="section">
+    <h3>🔐 身份认证</h3>
+    <div class="query-box">
+      <input type="text" id="searchId" placeholder="请输入学号" />
+      <input type="text" id="searchName" placeholder="请输入姓名" />
+      <button onclick="authAndQuery()">认证并查询</button>
+      <button class="close" onclick="logout()">退出登录</button>
+      <span id="authTip"></span>
+    </div>
+    <div id="resultArea" class="data-card" style="display:none;"></div>
+  </div>
+
+  <!-- 2. 数据录入 -->
+  <div class="section">
+    <h3>📥 数据录入</h3>
+    <button class="disabled">暂未开放</button>
+  </div>
+
+  <!-- 3. 数据分析 -->
+  <div id="analysisSection" class="section">
+    <h3>📊 数据可视化分析（已认证）</h3>
+    <div class="flex-row">
+      <select id="chartType">
+        <option value="line">折线图（时间趋势）</option>
+        <option value="bar">柱状图（归一对比）</option>
+      </select>
+      <select id="dataItem1">
+        <option value="weight">体重(kg)</option>
+        <option value="bmi">BMI</option>
+        <option value="fat">体脂率</option>
+        <option value="heart">心率</option>
+        <option value="sugar">血糖</option>
+      </select>
+      <select id="dataItem2">
+        <option value="none">不选</option>
+        <option value="weight">体重(kg)</option>
+        <option value="bmi">BMI</option>
+        <option value="fat">体脂率</option>
+      </select>
+      <button onclick="drawChart()">生成图表</button>
+    </div>
+    <div class="tip">折线图：时间变化趋势；柱状图：多指标对比；可多选叠加</div>
+    <div class="chart-box">
+      <canvas id="dataChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ================= 学生健康数据 =================
+  const sourceData = [
+{ id: "246963676001", name: "小红", date: "2026-04-01", weight: 48.24, bmi: 21.4, fat: 0.312, sugar: 5.1, heart: 79, pressure: 111, sbp: 114, dbp: 89 },
+{ id: "246963676001", name: "小红", date: "2026-05-01", weight: 47.8, bmi: 21.2, fat: 0.305, sugar: 5.0, heart: 77, pressure: 108, sbp: 112, dbp: 87 },
+{ id: "246963676001", name: "小红", date: "2026-06-01", weight: 47.5, bmi: 21.0, fat: 0.298, sugar: 4.9, heart: 75, pressure: 105, sbp: 110, dbp: 85 },
+{ id: "246963676002", name: "小明", date: "2026-04-10", weight: 64.79, bmi: 23.5, fat: 0.303, sugar: 4.6, heart: 66, pressure: 93, sbp: 110, dbp: 79 },
+{ id: "246963676002", name: "小明", date: "2026-06-10", weight: 63.5, bmi: 23.0, fat: 0.295, sugar: 4.5, heart: 65, pressure: 90, sbp: 108, dbp: 78 },
+{ id: "246963676003", name: "李强军", date: "2026-05-06", weight: 55.23, bmi: 20.0, fat: 0.118, sugar: 4.9, heart: 71, pressure: 96, sbp: 126, dbp: 62 },
+{ id: "246963676003", name: "李强军", date: "2026-06-06", weight: 54.8, bmi: 19.8, fat: 0.115, sugar: 4.8, heart: 70, pressure: 94, sbp: 124, dbp: 61 },
+{ id: "246963676004", name: "何英", date: "2026-04-26", weight: 61.27, bmi: 19.3, fat: 0.172, sugar: 5.3, heart: 69, pressure: 83, sbp: 105, dbp: 79 },
+{ id: "246963676004", name: "何英", date: "2026-05-26", weight: 60.9, bmi: 19.2, fat: 0.170, sugar: 5.2, heart: 68, pressure: 82, sbp: 104, dbp: 78 },
+{ id: "246963676004", name: "何英", date: "2026-06-26", weight: 60.5, bmi: 19.0, fat: 0.168, sugar: 5.1, heart: 67, pressure: 80, sbp: 103, dbp: 77 },
+{ id: "246963676005", name: "杜远涛", date: "2026-05-28", weight: 65.45, bmi: 22.6, fat: 0.149, sugar: 5.2, heart: 77, pressure: 125, sbp: 136, dbp: 62 },
+{ id: "246963676005", name: "杜远涛", date: "2026-06-28", weight: 64.9, bmi: 22.4, fat: 0.147, sugar: 5.1, heart: 76, pressure: 123, sbp: 134, dbp: 61 },
+{ id: "246963676006", name: "孙强", date: "2026-06-06", weight: 66.71, bmi: 25.7, fat: 0.29, sugar: 4.5, heart: 78, pressure: 63, sbp: 123, dbp: 64 },
+{ id: "246963676006", name: "孙强", date: "2026-06-26", weight: 66.2, bmi: 25.5, fat: 0.288, sugar: 4.4, heart: 77, pressure: 62, sbp: 122, dbp: 63 },
+{ id: "246963676007", name: "刘静杰", date: "2026-05-29", weight: 59.32, bmi: 23.2, fat: 0.285, sugar: 4.8, heart: 75, pressure: 82, sbp: 134, dbp: 73 },
+{ id: "246963676007", name: "刘静杰", date: "2026-06-09", weight: 58.9, bmi: 23.0, fat: 0.282, sugar: 4.7, heart: 74, pressure: 81, sbp: 133, dbp: 72 },
+{ id: "246963676007", name: "刘静杰", date: "2026-06-19", weight: 58.5, bmi: 22.8, fat: 0.279, sugar: 4.6, heart: 73, pressure: 80, sbp: 132, dbp: 71 },
+{ id: "246963676008", name: "王丽芳", date: "2026-04-26", weight: 52.4, bmi: 18.6, fat: 0.269, sugar: 4.2, heart: 65, pressure: 56, sbp: 112, dbp: 85 },
+{ id: "246963676008", name: "王丽芳", date: "2026-05-26", weight: 52.1, bmi: 18.5, fat: 0.267, sugar: 4.1, heart: 64, pressure: 55, sbp: 111, dbp: 84 },
+{ id: "246963676009", name: "沈楠", date: "2026-06-01", weight: 52.45, bmi: 18.8, fat: 0.114, sugar: 5.4, heart: 98, pressure: 109, sbp: 102, dbp: 65 },
+{ id: "246963676009", name: "沈楠", date: "2026-06-11", weight: 52.2, bmi: 18.7, fat: 0.113, sugar: 5.3, heart: 97, pressure: 108, sbp: 101, dbp: 64 },
+{ id: "246963676010", name: "钱芳芳", date: "2026-04-28", weight: 68.69, bmi: 25.9, fat: 0.153, sugar: 4.6, heart: 72, pressure: 95, sbp: 93, dbp: 67 },
+{ id: "246963676010", name: "钱芳芳", date: "2026-05-28", weight: 68.2, bmi: 25.7, fat: 0.151, sugar: 4.5, heart: 71, pressure: 94, sbp: 92, dbp: 66 },
+{ id: "246963676010", name: "钱芳芳", date: "2026-06-28", weight: 67.8, bmi: 25.5, fat: 0.149, sugar: 4.4, heart: 70, pressure: 93, sbp: 91, dbp: 65 },
+{ id: "246963676011", name: "张静李", date: "2026-05-08", weight: 59.57, bmi: 24.5, fat: 0.19, sugar: 5.4, heart: 75, pressure: 109, sbp: 120, dbp: 71 },
+{ id: "246963676011", name: "张静李", date: "2026-06-08", weight: 59.1, bmi: 24.3, fat: 0.188, sugar: 5.3, heart: 74, pressure: 108, sbp: 119, dbp: 70 },
+];
+
+  let currentUserId = null;
+  let currentUserData = [];
+  let chartInstance = null;
+
+  // 身份认证 + 查询（查询全部历史）
+  function authAndQuery() {
+    let id = document.getElementById("searchId").value.trim();
+    let name = document.getElementById("searchName").value.trim();
+    let authTip = document.getElementById("authTip");
+    let resultArea = document.getElementById("resultArea");
+    let analysisSection = document.getElementById("analysisSection");
+
+    if (!id || !name) {
+      authTip.className = "auth-fail";
+      authTip.innerText = "❌ 请输入完整姓名+学号";
+      return;
+    }
+
+    // 找出该学生所有历史记录
+    let userDataList = sourceData.filter(item => 
+      item.id === id && item.name === name
+    );
+
+    if (userDataList.length === 0) {
+      authTip.className = "auth-fail";
+      authTip.innerText = "❌ 身份信息不匹配，无法查看数据";
+      resultArea.style.display = "none";
+      analysisSection.style.display = "none";
+      currentUserId = null;
+      currentUserData = [];
+      return;
+    }
+
+    // 按日期排序
+    userDataList.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    currentUserId = id;
+    currentUserData = userDataList;
+
+    authTip.className = "auth-success";
+    authTip.innerText = "✅ 认证成功，已解锁全部功能";
+
+    // 显示所有历史数据（表格）
+    let html = `<strong>学生：${name}（学号：${id}）</strong><br><br>`;
+    html += `
+    <table>
+      <tr>
+        <th>检查日期</th><th>体重(kg)</th><th>BMI</th><th>体脂率</th><th>血糖</th><th>心率</th><th>血压</th>
+      </tr>
+    `;
+    userDataList.forEach(item => {
+      html += `
+      <tr>
+        <td>${item.date}</td>
+        <td>${item.weight}</td>
+        <td>${item.bmi}</td>
+        <td>${(item.fat*100).toFixed(1)}%</td>
+        <td>${item.sugar}</td>
+        <td>${item.heart}</td>
+        <td>${item.sbp}/${item.dbp}</td>
+      </tr>
+      `;
+    });
+    html += "</table>";
+
+    resultArea.innerHTML = html;
+    resultArea.style.display = "block";
+    analysisSection.style.display = "block";
+  }
+
+  // 退出登录
+  function logout() {
+    currentUserId = null;
+    currentUserData = [];
+    document.getElementById("searchId").value = "";
+    document.getElementById("searchName").value = "";
+    document.getElementById("authTip").innerText = "";
+    document.getElementById("resultArea").style.display = "none";
+    document.getElementById("analysisSection").style.display = "none";
+    if (chartInstance) chartInstance.destroy();
+  }
+
+  // 绘制图表（支持时间趋势）
+  function drawChart() {
+    if (!currentUserId || currentUserData.length === 0) {
+      alert("请先完成身份认证");
+      return;
+    }
+
+    let type = document.getElementById("chartType").value;
+    let item1 = document.getElementById("dataItem1").value;
+    let item2 = document.getElementById("dataItem2").value;
+
+    // 时间轴
+    let labels = currentUserData.map(item => item.date);
+    let datasets = [];
+
+    const map = {
+      weight: { label: "体重(kg)", key: "weight", color: "#2d8cf0" },
+      bmi: { label: "BMI", key: "bmi", color: "#67c23a" },
+      fat: { label: "体脂率(%)", key: "fat", color: "#e6a23c" },
+      heart: { label: "心率", key: "heart", color: "#f56c6c" },
+      sugar: { label: "血糖", key: "sugar", color: "#909399" }
+    };
+
+    // 指标1
+    datasets.push({
+      label: map[item1].label,
+      data: currentUserData.map(item => item[map[item1].key]),
+      borderColor: map[item1].color,
+      backgroundColor: map[item1].color + "33",
+      tension: 0.3,
+      fill: type === "line"
+    });
+
+    // 指标2
+    if (item2 !== "none") {
+      datasets.push({
+        label: map[item2].label,
+        data: currentUserData.map(item => item[map[item2].key]),
+        borderColor: map[item2].color,
+        backgroundColor: map[item2].color + "33",
+        tension: 0.3,
+        fill: type === "line"
+      });
+    }
+
+    if (chartInstance) chartInstance.destroy();
+
+    let ctx = document.getElementById("dataChart").getContext("2d");
+    chartInstance = new Chart(ctx, {
+      type: type,
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          title: { display: true, text: "个人健康数据趋势" }
+        }
+      }
+    });
+  }
+</script>
+</body>
+</html>
